@@ -1,0 +1,6 @@
+
+need to make the line gone which are connecting the tiles
+matching points gets added after clicking another tile
+time in minutes
+new feature:
+- Color threshold for hard level
