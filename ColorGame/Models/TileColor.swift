@@ -18,4 +18,22 @@ enum TileColor: CaseIterable {
         case .purple: return .purple
         }
     }
+
+    /// Shape used when accessibility mode is enabled
+    @ViewBuilder
+    func shape(cornerRadius: CGFloat = 10) -> some View {
+        switch self {
+        case .red:
+            Circle()
+        case .green:
+            RoundedRectangle(cornerRadius: cornerRadius)
+        case .blue:
+            TriangleShape()
+        case .yellow:
+            DiamondShape()
+        case .purple:
+            Capsule()
+        }
+    }
 }
+

@@ -3,6 +3,8 @@
 //  ColorGame
 //
 //  Created by Yulani on 2026-01-16.
+//
+
 import SwiftUI
 
 struct TileView: View {
@@ -14,26 +16,37 @@ struct TileView: View {
     @State private var opacity: Double = 1.0
 
     var body: some View {
+        let shape = tileShape
+
         let fillStyle: AnyShapeStyle = {
             switch accessibilityMode {
             case .highContrast:
-                return AnyShapeStyle(tile.color.color)
+                return AnyShapeStyle(tile.color.highContrastColor)
             case .normal, .shapesOnly:
                 return AnyShapeStyle(tile.color.color.gradient)
             }
         }()
 
-        let shape = tileAnyShape // ✅ one unified shape type
-
         ZStack {
             shape
                 .fill(fillStyle)
-                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
 
-            shape
-                .stroke(.white, lineWidth: isSelected ? 3 : 1)
-                .shadow(color: .white.opacity(isSelected ? 0.8 : 0), radius: isSelected ? 10 : 0)
+            // ✅ Strong outline in High Contrast (this makes it clearly different)
+            if accessibilityMode == .highContrast {
+                shape
+                    .stroke(.black.opacity(0.9), lineWidth: 3)
+            } else {
+                shape
+                    .stroke(.white.opacity(0.18), lineWidth: 1)
+            }
+
+            if isSelected {
+                shape
+                    .stroke(.white, lineWidth: 3)
+                    .shadow(color: .white.opacity(0.8), radius: 10)
+            }
         }
+        .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
         .aspectRatio(1, contentMode: .fit)
         .scaleEffect(popScale)
         .opacity(opacity)
@@ -41,28 +54,15 @@ struct TileView: View {
         .onChange(of: tile.isVisible) { animateVisibility($0) }
     }
 
-    // ✅ This is the key fix: always return AnyShape
-    private var tileAnyShape: AnyShape {
+    private var tileShape: AnyShape {
         switch accessibilityMode {
         case .normal, .highContrast:
             return AnyShape(RoundedRectangle(cornerRadius: 10))
         case .shapesOnly:
-            switch tile.color {
-            case .red:
-                return AnyShape(Circle())
-            case .green:
-                return AnyShape(RoundedRectangle(cornerRadius: 10))
-            case .blue:
-                return AnyShape(TriangleShape())
-            case .yellow:
-                return AnyShape(DiamondShape())
-            case .purple:
-                return AnyShape(Capsule())
-            }
+            return tile.color.anyShape()
         }
     }
 
-    // MARK: - Animations
     private func animateSelection(_ selected: Bool) {
         if selected {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.5)) {
@@ -91,3 +91,4 @@ struct TileView: View {
         }
     }
 }
+

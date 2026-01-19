@@ -33,7 +33,6 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Profile View
 struct ProfileView: View {
     let username: String
     let highScore: Int
@@ -54,9 +53,8 @@ struct ProfileView: View {
     }
 }
 
-// MARK: - Achievements View
 struct AchievementsView: View {
-    // Example achievements; replace with dynamic data if needed
+    
     let achievements: [Achievement] = [
         Achievement(title: "First Match", description: "Complete your first match", achieved: true),
         Achievement(title: "Score 500", description: "Reach 500 points", achieved: false),

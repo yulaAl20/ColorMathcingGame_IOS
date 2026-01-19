@@ -7,17 +7,23 @@ import SwiftUI
 
 struct GameView: View {
     @StateObject private var engine: GameEngine
+    @ObservedObject var profileStore: PlayerProfileStore
+    let accessibilityMode: AccessibilityMode
+
     @Environment(\.dismiss) private var dismiss
 
-    init(difficulty: Difficulty) {
+    init(difficulty: Difficulty,
+         profileStore: PlayerProfileStore,
+         accessibilityMode: AccessibilityMode) {
         _engine = StateObject(wrappedValue: GameEngine(difficulty: difficulty))
+        self.profileStore = profileStore
+        self.accessibilityMode = accessibilityMode
     }
 
     var body: some View {
         VStack {
             header
 
-            // 🟦 Grid ONLY (no lines)
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: engine.size),
                 spacing: 4
@@ -26,17 +32,15 @@ struct GameView: View {
                     if tile.isVisible {
                         TileView(
                             tile: tile,
-                            isSelected: engine.selectedTiles.contains(tile)
+                            isSelected: engine.selectedTiles.contains(tile),
+                            accessibilityMode: accessibilityMode
                         )
-                        .onTapGesture {
-                            engine.select(tile: tile)
-                        }
+                        .onTapGesture { engine.select(tile: tile) }
                     }
                 }
             }
             .padding()
 
-            // ✅ Simple combo multiplier UI
             if engine.comboMultiplier > 1 {
                 Text("Combo x\(engine.comboMultiplier)")
                     .foregroundStyle(.white)
@@ -45,6 +49,9 @@ struct GameView: View {
             }
         }
         .navigationBarHidden(true)
+        .onChange(of: engine.score) { _, newScore in
+            profileStore.updateHighScoreIfNeeded(newScore)
+        }
     }
 
     private var header: some View {
@@ -56,9 +63,11 @@ struct GameView: View {
             Spacer()
 
             VStack(spacing: 4) {
-                Text("Score: \(engine.score)")
-                Text("Level: \(engine.level)")
+                Text(profileStore.profile?.username ?? "Player")
+                    .font(.headline)
+                Text("Score: \(engine.score)  •  Level: \(engine.level)")
                     .opacity(0.85)
+                    .font(.subheadline)
             }
 
             Spacer()
