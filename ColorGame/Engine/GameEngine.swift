@@ -1,17 +1,13 @@
 //
-//  HomeView.swift
+//  GameEngine.swift
 //  ColorGame
 //
 //  Created by cobsccomp242p-066 on 2026-01-12.
-
 import SwiftUI
 import Combine
-
-
+import UIKit
 
 final class GameEngine: ObservableObject {
-
-
 
     @Published var grid: [[Tile]] = []
     @Published var selectedTiles: [Tile] = []
@@ -20,6 +16,11 @@ final class GameEngine: ObservableObject {
     @Published var lastScoreGained: Int = 0
     @Published var isInvalidSelection: Bool = false
     @Published var collectedColors: [TileColor: Int] = [:]
+    @Published var level: Int = 1
+    @Published var isProcessingMatch: Bool = false
+
+    // ✅ New: combo
+    @Published var comboMultiplier: Int = 1
 
     let difficulty: Difficulty
     let size: Int
@@ -32,25 +33,27 @@ final class GameEngine: ObservableObject {
         startTimer()
     }
 
-
     func setupGrid() {
         grid = (0..<size).map { row in
             (0..<size).map { col in
                 Tile(
                     color: TileColor.allCases.randomElement()!,
                     row: row,
-                    col: col
+                    col: col,
+                    isVisible: true
                 )
             }
         }
         selectedTiles.removeAll()
+        comboMultiplier = 1
     }
 
-    //Tile Selection
-
     func select(tile: Tile) {
+        guard !isProcessingMatch else { return }
+
         guard let last = selectedTiles.last else {
             selectedTiles = [tile]
+            isInvalidSelection = false
             return
         }
 
@@ -65,41 +68,75 @@ final class GameEngine: ObservableObject {
             selectedTiles.append(tile)
             isInvalidSelection = false
         } else {
-            // Auto-complete previous selection
+            // ✅ This is what makes score add AFTER you tap another tile
             completeMatch()
             selectedTiles = [tile]
         }
     }
 
     func completeMatch() {
-        guard selectedTiles.count >= 3 else {
-            // Not enough tiles to match
+        // ✅ "Color threshold" for hard is implemented here
+        guard selectedTiles.count >= difficulty.minMatchCount else {
             selectedTiles.removeAll()
+            comboMultiplier = 1
             return
         }
 
-        // Calculate score
-        let gained = selectedTiles.count * 10
-        score += gained
+        isProcessingMatch = true
+
+        let matchedTiles = selectedTiles
+
+        // ✅ combo multiplier: grows with streak, capped to keep UI sane
+        comboMultiplier = min(comboMultiplier + 1, 5)
+
+        let base = matchedTiles.count * 10 * level
+        let gained = base * comboMultiplier
         lastScoreGained = gained
 
-        // Update collected colors for hard level
-        if let color = selectedTiles.first?.color {
-            collectedColors[color, default: 0] += selectedTiles.count
+        // Track collected colors
+        if let color = matchedTiles.first?.color {
+            collectedColors[color, default: 0] += matchedTiles.count
         }
 
-        // Remove matched tiles and refill
-        for tile in selectedTiles {
-            grid[tile.row][tile.col].color = TileColor.allCases.randomElement()!
+        // Hide matched tiles
+        for tile in matchedTiles {
+            grid[tile.row][tile.col].isVisible = false
         }
 
-        // Clear selection
         selectedTiles.removeAll()
+
+        // ✅ Add score after a short effect delay (optional)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            self.score += gained
+            self.levelUpIfNeeded()
+            self.refillHiddenTiles()
+            self.isProcessingMatch = false
+
+            // ✅ Haptic feedback (simple)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
     }
 
-    
-    
-    
+    private func refillHiddenTiles() {
+        for row in 0..<size {
+            for col in 0..<size {
+                if !grid[row][col].isVisible {
+                    grid[row][col] = Tile(
+                        color: TileColor.allCases.randomElement()!,
+                        row: row,
+                        col: col,
+                        isVisible: true
+                    )
+                }
+            }
+        }
+    }
+
+    private func levelUpIfNeeded() {
+        if score >= level * 300 {
+            level += 1
+        }
+    }
 
     private func startTimer() {
         guard let limit = difficulty.timeLimit else { return }

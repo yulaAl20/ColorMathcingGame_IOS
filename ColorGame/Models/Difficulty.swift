@@ -36,6 +36,15 @@ enum Difficulty: String, CaseIterable, Identifiable {
         case .hard: return 900
         }
     }
+
+    //"Color threshold" for hard level (minimum tiles required to count as a match)
+    var minMatchCount: Int {
+        switch self {
+        case .easy, .medium: return 3
+        case .hard: return 4
+        }
+    }
 }
+
 
 

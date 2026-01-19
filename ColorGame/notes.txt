@@ -1,6 +1,27 @@
 
 need to make the line gone which are connecting the tiles
 matching points gets added after clicking another tile
-time in minutes
+time in minutes and seconds
 new feature:
 - Color threshold for hard level
+
+Lecturer suggestions:
+1. Accessibility for color blind people (different types of color bliindnesses) - with a accessibility function choosing in the startup page
+use shapes instead colors maybe
+2. Game build up level-wise, different level generation path for easy,medium, hard levels.
+
+TILE GRAPHICS:
+Particle sparks
+Haptic feedback on match
+Screen shake on big combos
+Combo multiplier UI (x2, x3, etc.)
+
+
+
+How Scoring Works:
+Matched tiles = N
+Base score     = N × 10
+Level bonus    = × level
+Final gain     = N × 10 × level
+
+

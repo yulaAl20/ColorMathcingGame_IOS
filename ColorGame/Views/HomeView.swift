@@ -9,21 +9,21 @@ struct HomeView: View {
     var body: some View {
         ZStack {
             Color.primaryBackground.ignoresSafeArea()
-
+            
             VStack(spacing: 40) {
                 VStack(spacing: 12) {
                     Image(systemName: "square.grid.3x3.fill")
                         .font(.system(size: 64))
                         .foregroundStyle(.purple)
-
-                    Text("Sweet Match")
+                    
+                    Text("Color Tap")
                         .font(.largeTitle.bold())
                         .foregroundColor(.white)
-
-                    Text("Match identical tiles to score points")
+                    
+                    Text("Tap on the same colored tiles to score points")
                         .foregroundColor(.white.opacity(0.7))
                 }
-
+                
                 VStack(spacing: 16) {
                     ForEach(Difficulty.allCases, id: \.self) { level in
                         NavigationLink {

@@ -7,17 +7,15 @@
 import SwiftUI
 
 enum TileColor: CaseIterable {
-    case red, yellow, green, blue, purple
+    case red, green, blue, yellow, purple
 
     var color: Color {
         switch self {
         case .red: return .red
-        case .yellow: return .yellow
         case .green: return .green
         case .blue: return .blue
+        case .yellow: return .yellow
         case .purple: return .purple
         }
     }
 }
-
-

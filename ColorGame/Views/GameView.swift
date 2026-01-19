@@ -1,14 +1,12 @@
 //
-//  HomeView.swift
+//  GameView.swift
 //  ColorGame
 //
 //  Created by cobsccomp242p-066 on 2026-01-12.
-
 import SwiftUI
 
 struct GameView: View {
     @StateObject private var engine: GameEngine
-    @State private var positions: [UUID: CGPoint] = [:]
     @Environment(\.dismiss) private var dismiss
 
     init(difficulty: Difficulty) {
@@ -19,56 +17,32 @@ struct GameView: View {
         VStack {
             header
 
-            ZStack {
-                // 🔗 Connection line
-                Canvas { context, _ in
-                    var path = Path()
-                    for (index, tile) in engine.selectedTiles.enumerated() {
-                        guard let point = positions[tile.id] else { continue }
-                        index == 0 ? path.move(to: point) : path.addLine(to: point)
-                    }
-                    context.stroke(path, with: .color(.white), lineWidth: 4)
-                }
-
-                // 🟦 Grid
-                LazyVGrid(
-                    columns: Array(
-                        repeating: GridItem(.flexible(), spacing: 4),
-                        count: engine.size
-                    ),
-                    spacing: 4
-                ) {
-                    ForEach(engine.grid.flatMap { $0 }) { tile in
+            // 🟦 Grid ONLY (no lines)
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: engine.size),
+                spacing: 4
+            ) {
+                ForEach(engine.grid.flatMap { $0 }) { tile in
+                    if tile.isVisible {
                         TileView(
                             tile: tile,
                             isSelected: engine.selectedTiles.contains(tile)
                         )
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(
-                                    key: TilePositionKey.self,
-                                    value: [
-                                        tile.id:
-                                            geo.frame(in: .named("grid"))
-                                               .centerPoint
-                                    ]
-                                )
-                            }
-                        )
                         .onTapGesture {
                             engine.select(tile: tile)
-
                         }
-
                     }
-                }
-                .coordinateSpace(name: "grid")
-                .onPreferenceChange(TilePositionKey.self) {
-                    positions = $0
                 }
             }
             .padding()
-            
+
+            // ✅ Simple combo multiplier UI
+            if engine.comboMultiplier > 1 {
+                Text("Combo x\(engine.comboMultiplier)")
+                    .foregroundStyle(.white)
+                    .font(.headline)
+                    .padding(.top, 6)
+            }
         }
         .navigationBarHidden(true)
     }
@@ -81,16 +55,26 @@ struct GameView: View {
 
             Spacer()
 
-            Text("Score: \(engine.score)")
-                .font(.headline)
+            VStack(spacing: 4) {
+                Text("Score: \(engine.score)")
+                Text("Level: \(engine.level)")
+                    .opacity(0.85)
+            }
 
             Spacer()
 
             if let time = engine.remainingTime {
-                Text("⏱ \(time)s")
+                Text("⏱ \(formatTime(time))")
+                    .monospacedDigit()
             }
         }
         .foregroundColor(.white)
         .padding()
+    }
+
+    private func formatTime(_ seconds: Int) -> String {
+        let m = seconds / 60
+        let s = seconds % 60
+        return String(format: "%02d:%02d", m, s)
     }
 }
