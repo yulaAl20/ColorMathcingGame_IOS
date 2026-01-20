@@ -3,6 +3,7 @@
 //  ColorGame
 //
 //  Created by cobsccomp242p-066 on 2026-01-12.
+
 import SwiftUI
 import Combine
 import UIKit
@@ -13,31 +14,54 @@ final class GameEngine: ObservableObject {
     @Published var selectedTiles: [Tile] = []
     @Published var score: Int = 0
     @Published var remainingTime: Int?
-    @Published var lastScoreGained: Int = 0
-    @Published var isInvalidSelection: Bool = false
     @Published var collectedColors: [TileColor: Int] = [:]
-    @Published var level: Int = 1
-    @Published var isProcessingMatch: Bool = false
-
-    // ✅ New: combo
     @Published var comboMultiplier: Int = 1
+    @Published var lastScoreGained: Int = 0
 
-    let difficulty: Difficulty
-    let size: Int
+    @Published var isProcessingMatch: Bool = false
+    @Published var didWin: Bool = false
+    @Published var isLevelOver: Bool = false
+
+    @Published private(set) var config: LevelConfig
+
     private var timer: Timer?
 
-    init(difficulty: Difficulty) {
-        self.difficulty = difficulty
-        self.size = difficulty.gridSize
+    init(level: Int) {
+        self.config = LevelTimeline.config(for: level)
+        loadLevel(level)
+    }
+
+    var level: Int { config.level }
+
+    func loadLevel(_ level: Int) {
+        timer?.invalidate()
+
+        config = LevelTimeline.config(for: level)
+        score = 0
+        selectedTiles.removeAll()
+        collectedColors = [:]
+        comboMultiplier = 1
+        lastScoreGained = 0
+        didWin = false
+        isLevelOver = false
+        isProcessingMatch = false
+
         setupGrid()
-        startTimer()
+        startTimerIfNeeded()
+    }
+
+    func restartLevel() {
+        loadLevel(config.level)
     }
 
     func setupGrid() {
+        let pool = config.colorPool
+        let size = config.gridSize
+
         grid = (0..<size).map { row in
             (0..<size).map { col in
                 Tile(
-                    color: TileColor.allCases.randomElement()!,
+                    color: pool.randomElement()!,
                     row: row,
                     col: col,
                     isVisible: true
@@ -45,15 +69,14 @@ final class GameEngine: ObservableObject {
             }
         }
         selectedTiles.removeAll()
-        comboMultiplier = 1
     }
 
     func select(tile: Tile) {
-        guard !isProcessingMatch else { return }
+        guard !isProcessingMatch, !isLevelOver else { return }
 
         guard let last = selectedTiles.last else {
             selectedTiles = [tile]
-            isInvalidSelection = false
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             return
         }
 
@@ -61,22 +84,20 @@ final class GameEngine: ObservableObject {
             abs(last.row - tile.row) <= 1 &&
             abs(last.col - tile.col) <= 1
 
-        if isAdjacent &&
-            tile.color == last.color &&
-            !selectedTiles.contains(tile) {
-
+        if isAdjacent && tile.color == last.color && !selectedTiles.contains(tile) {
             selectedTiles.append(tile)
-            isInvalidSelection = false
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
         } else {
-            // ✅ This is what makes score add AFTER you tap another tile
             completeMatch()
             selectedTiles = [tile]
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }
 
     func completeMatch() {
-        // ✅ "Color threshold" for hard is implemented here
-        guard selectedTiles.count >= difficulty.minMatchCount else {
+        guard !isProcessingMatch, !isLevelOver else { return }
+
+        guard selectedTiles.count >= config.minMatchCount else {
             selectedTiles.removeAll()
             comboMultiplier = 1
             return
@@ -84,47 +105,55 @@ final class GameEngine: ObservableObject {
 
         isProcessingMatch = true
 
-        let matchedTiles = selectedTiles
-
-        // ✅ combo multiplier: grows with streak, capped to keep UI sane
-        comboMultiplier = min(comboMultiplier + 1, 5)
-
-        let base = matchedTiles.count * 10 * level
-        let gained = base * comboMultiplier
-        lastScoreGained = gained
-
-        // Track collected colors
-        if let color = matchedTiles.first?.color {
-            collectedColors[color, default: 0] += matchedTiles.count
-        }
-
-        // Hide matched tiles
-        for tile in matchedTiles {
-            grid[tile.row][tile.col].isVisible = false
-        }
-
+        let matched = selectedTiles
         selectedTiles.removeAll()
 
-        // ✅ Add score after a short effect delay (optional)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+        if let c = matched.first?.color {
+            collectedColors[c, default: 0] += matched.count
+        }
+
+        let lengthBonus = bonus(for: matched.count)
+        let perTile = config.scorePerTile
+        let gainedRaw = matched.count * perTile + lengthBonus
+
+        comboMultiplier = min(comboMultiplier + 1, config.comboCap)
+        let gained = gainedRaw * comboMultiplier
+        lastScoreGained = gained
+
+        for t in matched {
+            grid[t.row][t.col].isVisible = false
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             self.score += gained
-            self.levelUpIfNeeded()
             self.refillHiddenTiles()
             self.isProcessingMatch = false
 
-            // ✅ Haptic feedback (simple)
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+            self.evaluateLevelState()
         }
     }
 
+    private func bonus(for length: Int) -> Int {
+        if length <= 3 { return 0 }
+        if length == 4 { return 6 }
+        if length == 5 { return 14 }
+        if length == 6 { return 25 }
+        return 40
+    }
+
     private func refillHiddenTiles() {
-        for row in 0..<size {
-            for col in 0..<size {
-                if !grid[row][col].isVisible {
-                    grid[row][col] = Tile(
-                        color: TileColor.allCases.randomElement()!,
-                        row: row,
-                        col: col,
+        let size = config.gridSize
+        let pool = config.colorPool
+
+        for r in 0..<size {
+            for c in 0..<size {
+                if !grid[r][c].isVisible {
+                    grid[r][c] = Tile(
+                        color: pool.randomElement()!,
+                        row: r,
+                        col: c,
                         isVisible: true
                     )
                 }
@@ -132,29 +161,60 @@ final class GameEngine: ObservableObject {
         }
     }
 
-    private func levelUpIfNeeded() {
-        if score >= level * 300 {
-            level += 1
+    private func startTimerIfNeeded() {
+        guard let limit = config.timeLimitSeconds else {
+            remainingTime = nil
+            return
         }
-    }
 
-    private func startTimer() {
-        guard let limit = difficulty.timeLimit else { return }
         remainingTime = limit
-
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] t in
             guard let self else { return }
+            guard !self.isLevelOver else { t.invalidate(); return }
 
             if let time = self.remainingTime, time > 0 {
                 self.remainingTime = time - 1
             } else {
                 t.invalidate()
+                self.failLevel()
             }
         }
+    }
+
+    private func objectivesMet() -> Bool {
+        for obj in config.objectives {
+            let have = collectedColors[obj.color, default: 0]
+            if have < obj.required { return false }
+        }
+        return true
+    }
+
+    func evaluateLevelState() {
+        guard !isLevelOver else { return }
+
+        let scoreMet = score >= config.targetScore
+        let colorsMet = objectivesMet()
+
+        if scoreMet && colorsMet {
+            winLevel()
+        }
+    }
+
+    private func winLevel() {
+        isLevelOver = true
+        didWin = true
+        timer?.invalidate()
+    }
+
+    private func failLevel() {
+        isLevelOver = true
+        didWin = false
+        timer?.invalidate()
     }
 
     deinit {
         timer?.invalidate()
     }
 }
+

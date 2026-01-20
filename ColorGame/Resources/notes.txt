@@ -25,3 +25,6 @@ Level bonus    = × level
 Final gain     = N × 10 × level
 
 
+As per 19/01/26
+Add instructions to the game.
+Create the contrast one properly.
